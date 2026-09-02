@@ -37,6 +37,8 @@ public final class PinScreen extends Screen {
     private final Path worldRoot;
     private final String displayName;
     private final boolean setup;
+    private final boolean forCreation;
+    private final Runnable onCreate;
 
     // setup stages
     private static final int STAGE_PIN_FIRST = 0;
@@ -57,22 +59,35 @@ public final class PinScreen extends Screen {
     private PinMetaFile.PinMeta meta;           // unlock mode (lazy)
     private boolean[][] qrMatrix;               // setup TOTP verify (lazy)
 
-    private PinScreen(Screen backTo, String levelId, Path worldRoot, String displayName, boolean setup) {
+    private PinScreen(Screen backTo, String levelId, Path worldRoot, String displayName, boolean setup, boolean forCreation, Runnable onCreate) {
         super(Component.translatable("ciphersave.title"));
         this.backTo = backTo;
         this.levelId = levelId;
         this.worldRoot = worldRoot;
         this.displayName = displayName;
         this.setup = setup;
+        this.forCreation = forCreation;
+        this.onCreate = onCreate;
     }
 
     /** World with pin_meta.json → unlock; without → first-open setup. */
     public static PinScreen open(Screen backTo, String levelId, Path worldRoot, String displayName) {
-        return new PinScreen(backTo, levelId, worldRoot, displayName, !PinMetaFile.isPresent(worldRoot));
+        return new PinScreen(backTo, levelId, worldRoot, displayName, !PinMetaFile.isPresent(worldRoot), false, null);
+    }
+
+    /** Fresh-world creation gate: the world has not been generated yet; onCreate fires it after setup. */
+    public static PinScreen openForCreate(Screen backTo, String levelId, Path worldRoot, String displayName, Runnable onCreate) {
+        return new PinScreen(backTo, levelId, worldRoot, displayName, true, true, onCreate);
     }
 
     @Override
     public void onClose() {
+        if (forCreation && !PinMetaFile.isPresent(worldRoot)) {
+            try {
+                java.nio.file.Files.deleteIfExists(worldRoot);
+            } catch (IOException ignored) {
+            }
+        }
         this.minecraft.gui.setScreen(this.backTo);
     }
 
@@ -167,12 +182,7 @@ public final class PinScreen extends Screen {
                     fail(Component.translatable("ciphersave.error.badCode"));
                     return;
                 }
-                success();
-                try {
-                    CipherUnlock.setupAndOpen(minecraft, backTo, levelId, worldRoot, pendingMasterKey(), displayName, pinFirst, seedBase32);
-                } catch (GeneralSecurityException | IOException e) {
-                    fail(Component.translatable("ciphersave.error.setupFailed"));
-                }
+                finishSetup(seedBase32);
                 return;
             }
             byte[] masterKey = WorldFileCipher.unwrapWithTotp(meta(), totpCode.toString());
@@ -215,6 +225,21 @@ public final class PinScreen extends Screen {
             meta = PinMetaFile.read(worldRoot);
         }
         return meta;
+    }
+
+    /** Setup done — existing world: encrypt+decrypt and open. Fresh world: register session, then run creation. */
+    private void finishSetup(String seed) {
+        try {
+            if (forCreation) {
+                CipherUnlock.prepareForCreate(minecraft, worldRoot, pendingMasterKey(), displayName, pinFirst, seed);
+                success();
+                onCreate.run();
+            } else {
+                CipherUnlock.setupAndOpen(minecraft, backTo, levelId, worldRoot, pendingMasterKey(), displayName, pinFirst, seed);
+            }
+        } catch (GeneralSecurityException | IOException e) {
+            fail(Component.translatable("ciphersave.error.setupFailed"));
+        }
     }
 
     private void success() {
@@ -260,11 +285,7 @@ public final class PinScreen extends Screen {
                     stage = STAGE_TOTP_VERIFY;
                 } else if (index == 1) {
                     totpEnabled = false;
-                    try {
-                        CipherUnlock.setupAndOpen(minecraft, backTo, levelId, worldRoot, pendingMasterKey(), displayName, pinFirst, null);
-                    } catch (GeneralSecurityException | IOException e) {
-                        fail(Component.translatable("ciphersave.error.setupFailed"));
-                    }
+                    finishSetup(null);
                 }
             }
             case STAGE_TOTP_VERIFY -> {

@@ -75,9 +75,25 @@ public final class CipherUnlock {
     public static void setupAndOpen(
             Minecraft mc, Screen backTo, String levelId, Path worldRoot, byte[] masterKey, String displayName, String pin, String totpSeedOrNull
     ) throws GeneralSecurityException, java.io.IOException {
+        prepareForCreate(mc, worldRoot, masterKey, displayName, pin, totpSeedOrNull);
+        unlockAndOpen(mc, backTo, levelId, worldRoot, masterKey);
+    }
+
+    /**
+     * World-creation variant: write pin_meta.json and register a (currently empty) plaintext
+     * session BEFORE the world is generated, so the setup screen is part of the create flow.
+     * No files exist to encrypt/decrypt yet; the close hook encrypts after first play.
+     */
+    public static void prepareForCreate(
+            Minecraft mc, Path worldRoot, byte[] masterKey, String displayName, String pin, String totpSeedOrNull
+    ) throws GeneralSecurityException, java.io.IOException {
         PinMetaFile.PinMeta meta = WorldFileCipher.createPinMeta(displayName, pin, masterKey, totpSeedOrNull);
         PinMetaFile.write(worldRoot, meta);
-        unlockAndOpen(mc, backTo, levelId, worldRoot, masterKey);
+        WorldFileCipher cipher = new WorldFileCipher(worldRoot, masterKey);
+        cipher.encryptChanged();
+        cipher.decryptAll(null);
+        SessionMarker.activate(worldRoot);
+        CipherSessions.registerUnlocked(worldRoot, masterKey);
     }
 
     private static Thread thread(String name, Runnable r) {

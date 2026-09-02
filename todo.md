@@ -58,7 +58,8 @@ AES-256-GCM at rest; decrypt-in-place during a session; **PIN and TOTP (authenti
 ## 7. Client (— `src/client/...` + `ciphersave.client.mixins.json`)
 - [x] `CipherSaveClient` (ClientModInitializer)
 - [x] `WorldListEntryMixin` — `joinWorld` HEAD cancel on ALL worlds → `PinScreen.open(...)` (unlock or first-open setup; passes display name too)
-- [x] `CipherUnlock` — `unlockAndOpen` (crash-rescue encrypt → snapshot → decrypt → marker+session → openWorld on ProgressScreen, daemon thread) and `setupAndOpen` (write pin_meta → unlock sequence)
+- [x] `WorldOpenFlowsMixin` — **world-creation gate**: HEAD-cancel `createFreshLevel` → PIN setup → `CipherUnlock.prepareForCreate` (writes pin_meta + empty-session) → re-invoke original `createFreshLevel` (guard flag to avoid recursion)
+- [x] `CipherUnlock` — `unlockAndOpen` (crash-rescue encrypt → snapshot → decrypt → marker+session → openWorld on ProgressScreen, daemon thread), `setupAndOpen` (write pin_meta → unlock sequence), `prepareForCreate` (creation variant, no openWorld)
 - [x] `PinScreen` — **PIN and TOTP are EQUAL primary unlock methods** (toggle buttons switch input); setup: choose+confirm PIN → optional TOTP (QR + seed text + 6-digit test)
 - [x] Lang file `assets/ciphersave/lang/en_us.json` for all `ciphersave.*` keys
 - [ ] **Build verified; runtime UX untested** — layout sanity (QR stage spacing on small heights), glyph/width checks, sound triggers
@@ -70,15 +71,17 @@ AES-256-GCM at rest; decrypt-in-place during a session; **PIN and TOTP (authenti
   - duplicated `needsEncryption(Path)` (merged)
   - `createPinMeta` missing `throws IOException`
   - mixin `getLevelDirectory()` needs `@Shadow abstract`
-- [ ] `runClient` smoke test:
-  - [ ] Fresh world first open → PIN setup prompt (choose+confirm; optional TOTP QR verify; **use either method to then unlock**)
-  - [ ] After setup: files encrypted on disk at rest; session plays fine
-  - [ ] Quit to title → verify level.dat/regions/players encrypted (CS1 magic)
-  - [ ] Re-open world → PIN screen; wrong PIN → `VILLAGER_NO` + cleared field
-  - [ ] **Unlock with TOTP code** (without typing PIN) → world opens
-  - [ ] Unlock with PIN again → world opens
-  - [ ] Crash simulation: kill client with marker active → next unlock re-encrypts leftover plaintext first
-  - [ ] `ciphersave_backups/<utc>` snapshot created on unlock; only last 3 kept
+  - PinScreen double-blur crash (`extractBackground` already run by framework)
+- [~] `runClient` test round 1 (user):
+  - [x] Found: **crash — "Can only blur once per frame"** in `PinScreen.extractRenderState` → fixed
+  - [x] Found: **no PIN setup on fresh world creation** (creation bypasses `joinWorld`) → fixed via `WorldOpenFlowsMixin` gate
+  - [ ] Re-test: new-world creation shows setup screen
+  - [ ] Re-test: settings saved, quit → files encrypted (CS1 magic)
+  - [ ] Re-test: reopen → unlock screen; wrong PIN → `VILLAGER_NO` + cleared field
+  - [ ] Re-test: **unlock with TOTP code** (without PIN) → world opens
+  - [ ] Re-test: unlock with PIN → world opens
+  - [ ] Re-test: crash simulation (kill client, marker active) → next unlock re-encrypts leftovers first
+  - [ ] Re-test: `ciphersave_backups/<utc>` snapshot on unlock; keeps last 3
 - [ ] Commit + push milestones (per user request)
 
 ## 9. Notes / deferred
