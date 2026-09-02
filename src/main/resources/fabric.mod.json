@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "ciphersave",
+  "version": "${version}",
+  "name": "CipherSave",
+  "description": "Lock your world saves behind a PIN. AES-256-GCM encrypts level.dat, player data, and all region files; unlock with a PIN or an authenticator-app (TOTP) recovery code.",
+  "authors": [
+    "Nolan Bragan"
+  ],
+  "license": "Source-Available (No Redistribution)",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "dev.ciphersave.CipherSave"
+    ],
+    "client": [
+      "dev.ciphersave.client.CipherSaveClient"
+    ]
+  },
+  "mixins": [
+    "ciphersave.mixins.json",
+    {
+      "config": "ciphersave.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

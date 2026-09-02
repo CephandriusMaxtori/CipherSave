@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version "${loom_version}"
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
     id 'maven-publish'
 }
 
@@ -15,9 +15,10 @@ repositories {
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings loom.officialMojangMappings()
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    implementation "com.google.zxing:core:3.5.3"
+    include "com.google.zxing:core:3.5.3"
 }
 
 processResources {
@@ -46,4 +47,11 @@ jar {
 
 loom {
     splitEnvironmentSourceSets()
+
+    mods {
+        "ciphersave" {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
 }

@@ -1,0 +1,29 @@
+{
+  "ciphersave.title": "CipherSave",
+  "ciphersave.unlocking": "Unlocking",
+  "ciphersave.decrypting": "Decrypting world\u2026",
+  "ciphersave.unlock.failed": "Unlock failed",
+
+  "ciphersave.pin.enter": "Enter PIN",
+  "ciphersave.pin.choose": "Choose a PIN (4\u20138 characters)",
+  "ciphersave.pin.confirm": "Confirm your PIN",
+
+  "ciphersave.totp.scan": "Scan with your authenticator app",
+  "ciphersave.totp.enterLabel": "Enter 6-digit code",
+  "ciphersave.totp.enable": "Require TOTP code",
+  "ciphersave.totp.verify": "Verify & Finish",
+  "ciphersave.totp.skip": "Continue without",
+
+  "ciphersave.btn.next": "Next",
+  "ciphersave.btn.cancel": "Cancel",
+  "ciphersave.btn.back": "Back",
+  "ciphersave.btn.unlock": "Unlock",
+  "ciphersave.btn.usePin": "Use PIN",
+  "ciphersave.btn.useCode": "Use TOTP code",
+
+  "ciphersave.error.wrongPin": "Incorrect PIN",
+  "ciphersave.error.badCode": "Invalid code",
+  "ciphersave.error.tooShort": "PIN must be 4\u20138 characters",
+  "ciphersave.error.mismatch": "PINs do not match",
+  "ciphersave.error.setupFailed": "Setup failed"
+}
