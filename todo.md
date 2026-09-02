@@ -72,19 +72,28 @@ AES-256-GCM at rest; decrypt-in-place during a session; **PIN and TOTP (authenti
   - `createPinMeta` missing `throws IOException`
   - mixin `getLevelDirectory()` needs `@Shadow abstract`
   - PinScreen double-blur crash (`extractBackground` already run by framework)
-- [~] `runClient` test round 1 (user):
-  - [x] Found: **crash — "Can only blur once per frame"** in `PinScreen.extractRenderState` → fixed
-  - [x] Found: **no PIN setup on fresh world creation** (creation bypasses `joinWorld`) → fixed via `WorldOpenFlowsMixin` gate
-  - [ ] Re-test: new-world creation shows setup screen
-  - [ ] Re-test: settings saved, quit → files encrypted (CS1 magic)
-  - [ ] Re-test: reopen → unlock screen; wrong PIN → `VILLAGER_NO` + cleared field
-  - [ ] Re-test: **unlock with TOTP code** (without PIN) → world opens
-  - [ ] Re-test: unlock with PIN → world opens
-  - [ ] Re-test: crash simulation (kill client, marker active) → next unlock re-encrypts leftovers first
-  - [ ] Re-test: `ciphersave_backups/<utc>` snapshot on unlock; keeps last 3
+- [~] `runClient` test round 2:
+  - [x] **Happy path (PASS)**: created "New World" → setup screen at creation → played → quit → log `CipherSave: re-encrypted 18 files on world close`
+  - [x] Verified on disk after quit: `level.dat`, `level.dat_old`, `players/data/*.dat(.old)`, `dimensions/**/entities/*.mca` all start `CS1`; `pin_meta.json`/`ciphersave_manifest.json` present; **no** session marker left; 2 encrypted-state backups in `ciphersave_backups/`
+  - [x] Re-open → unlock screen → world opened → quit → re-encrypted 18 files again; clean shutdown
+  - [ ] Wrong PIN → `VILLAGER_NO`, field clears
+  - [ ] **Unlock with TOTP code** (no PIN)
+  - [ ] Crash simulation (kill client mid-session) → next unlock re-encrypts leftovers first
+  - [ ] Backup retention: only last 3 kept (open the world 4x → 3 backups)
+  - [x] Round-1 crash ("Can only blur once per frame") + no-setup-on-create → both fixed earlier
 - [ ] Commit + push milestones (per user request)
 
+## 8.5 UI + CI (round 3)
+- [x] PinScreen restyled to vanilla MC textures instead of flat fills:
+  - buttons → `widget/button` / `widget/button_highlighted` nine-slice sprites (hover highlight)
+  - PIN / TOTP input → vanilla `widget/text_field_highlighted` box around the masked dots
+- [x] `.github/workflows/build.yml` — JDK 25 (temurin) + Gradle cache; `./gradlew build` on push/PR to `master`; upload jars artifact; **on `v*` tags publishes a GitHub Release** with the jars (auto release notes)
+- [ ] Push-tag `v0.1.0` to trigger first real release (after user schedules it)
+- [ ] `runClient` re-test of restyled UI (creation setup + unlock + TOTP screens look right, hover/click fine)
+
 ## 9. Notes / deferred
+- [x] **Portability confirmed**: encrypted world folders are machine-independent — copy the locked world (incl. hidden `pin_meta.json` + `ciphersave_manifest.json`) to any PC with the mod → same PIN / TOTP seed unlocks it
+- [ ] **Idea — GitHub Pages web decrypter** (for game versions the mod doesn't support): client-side-only JS page (no upload): load `pin_meta.json` + any `CS1` file + PIN → decrypt in-browser → download. Uses same KDF/AES-GCM as the mod. Optional; gated on user decision.
 - [ ] Edit/Recreate buttons on a locked world will error `NbtException` (out of scope for v1) — acceptable toasts
 - [ ] Deletion of a locked world allowed (whole-folder delete)
 - [ ] Dedicated-server: common mixins apply; client screens N/A; singleplayer is primary target

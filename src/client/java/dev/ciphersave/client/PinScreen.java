@@ -12,8 +12,10 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundEvents;
 
 import java.io.IOException;
@@ -369,9 +371,10 @@ public final class PinScreen extends Screen {
     }
 
     private void drawMasked(GuiGraphicsExtractor g, int cx, int y, int len) {
+        g.blitSprite(RenderPipelines.GUI_TEXTURED,
+                Identifier.withDefaultNamespace("widget/text_field_highlighted"), cx - 60, y - 6, 120, 20);
         String dots = DOTS.repeat(len);
         g.centeredText(this.font, dots, cx, y, 0xFFFFFFFF);
-        g.fill(cx - 60, y + 12, cx + 60, y + 13, 0xFF666666);
     }
 
     // ------------------------------------------------------------------ rendering
@@ -388,7 +391,7 @@ public final class PinScreen extends Screen {
         graphics.centeredText(this.font, name, cx, 30, 0xFFB0B0B0);
 
         if (setup && stage >= STAGE_TOTP_VERIFY) {
-            renderTotpSetup(graphics);
+            renderTotpSetup(graphics, mouseX, mouseY);
             return;
         }
 
@@ -414,14 +417,15 @@ public final class PinScreen extends Screen {
         List<int[]> buttons = currentButtons();
         List<String> labels = currentLabels();
         for (int i = 0; i < buttons.size(); i++) {
-            drawButton(graphics, buttons.get(i), labels.get(i));
+            drawButton(graphics, buttons.get(i), labels.get(i), mouseX, mouseY);
         }
     }
 
-    private void drawButton(GuiGraphicsExtractor g, int[] b, String label) {
-        g.fill(b[0], b[1], b[0] + b[2], b[1] + b[3], 0xFF3A3F59);
-        g.fill(b[0], b[1], b[0] + b[2], b[1] + 1, 0xFF666C8C);
-        g.fill(b[0], b[1] + b[3] - 1, b[0] + b[2], b[1] + b[3], 0xFF2A2E44);
+    private void drawButton(GuiGraphicsExtractor g, int[] b, String label, int mouseX, int mouseY) {
+        boolean hovered = mouseX >= b[0] && mouseX < b[0] + b[2] && mouseY >= b[1] && mouseY < b[1] + b[3];
+        g.blitSprite(RenderPipelines.GUI_TEXTURED,
+                Identifier.withDefaultNamespace(hovered ? "widget/button_highlighted" : "widget/button"),
+                b[0], b[1], b[2], b[3]);
         g.centeredText(this.font, Component.literal(label), b[0] + b[2] / 2, b[1] + 6, 0xFFFFFFFF);
     }
 
@@ -432,7 +436,7 @@ public final class PinScreen extends Screen {
     private static final int QR_GAP = 12;
     private static final int QR_AFTER = 78;
 
-    private void renderTotpSetup(GuiGraphicsExtractor g) {
+    private void renderTotpSetup(GuiGraphicsExtractor g, int mouseX, int mouseY) {
         if (qrMatrix == null) {
             try {
                 String uri = QrEncoder.otpauthUri(seedBase32, displayName);
@@ -463,7 +467,7 @@ public final class PinScreen extends Screen {
         List<int[]> buttons = currentButtons();
         List<String> labels = currentLabels();
         for (int i = 0; i < buttons.size(); i++) {
-            drawButton(g, buttons.get(i), labels.get(i));
+            drawButton(g, buttons.get(i), labels.get(i), mouseX, mouseY);
         }
     }
 
