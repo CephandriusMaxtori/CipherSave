@@ -357,7 +357,8 @@ public final class PinScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float a) {
-        this.extractBackground(graphics, mouseX, mouseY, a);
+        // Background (panorama + blur + menu texture) is already extracted by the framework via
+        // extractRenderStateWithTooltipAndSubtitles -> extractBackground. Darken it further here.
         graphics.fill(0, 0, this.width, this.height, 0x99202028);
         int cx = this.width / 2;
 
