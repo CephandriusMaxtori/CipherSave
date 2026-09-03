@@ -80,6 +80,42 @@ public final class CipherUnlock {
     }
 
     /**
+     * Edit / Recreate gate: decrypt an already-protected world into a live session WITHOUT opening
+     * it, then run the given action on the render thread. Used so the vanilla Edit World / Recreate
+     * flows can read decrypted level data; the close hook re-encrypts afterwards for edit (for
+     * recreate, the fresh world is left plaintext and gets its own setup on first open).
+     */
+    public static void unlockForMaintenance(Minecraft mc, Path worldRoot, byte[] masterKey, Screen backTo, Runnable after) {
+        ProgressScreen progress = new ProgressScreen(true);
+        progress.progressStartNoAbort(Component.translatable("ciphersave.unlocking"));
+        progress.progressStage(Component.translatable("ciphersave.decrypting"));
+        mc.setScreenAndShow(progress);
+
+        thread("CipherSave-Maintenance", () -> {
+            try {
+                if (SessionMarker.isActive(worldRoot)) {
+                    new WorldFileCipher(worldRoot, masterKey).encryptChanged();
+                }
+                WorldFileCipher cipher = new WorldFileCipher(worldRoot, masterKey);
+                cipher.snapshotBackup();
+                cipher.decryptAll(null);
+                SessionMarker.activate(worldRoot);
+                CipherSessions.registerUnlocked(worldRoot, masterKey);
+                mc.execute(() -> {
+                    progress.stop();
+                    after.run();
+                });
+            } catch (Exception e) {
+                CipherSave.LOGGER.error("CipherSave: maintenance unlock failed for {}", worldRoot, e);
+                mc.execute(() -> {
+                    progress.stop();
+                    mc.gui.setScreen(new ErrorScreen(Component.translatable("ciphersave.unlock.failed"), Component.literal(String.valueOf(e))));
+                });
+            }
+        }).start();
+    }
+
+    /**
      * World-creation variant: write pin_meta.json and register a (currently empty) plaintext
      * session BEFORE the world is generated, so the setup screen is part of the create flow.
      * No files exist to encrypt/decrypt yet; the close hook encrypts after first play.

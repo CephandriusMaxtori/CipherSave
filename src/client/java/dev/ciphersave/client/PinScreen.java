@@ -41,6 +41,7 @@ public final class PinScreen extends Screen {
     private final boolean setup;
     private final boolean forCreation;
     private final Runnable onCreate;
+    private final Runnable onMaintenance;    // edit/recreate: run after decrypt (no world open)
 
     // setup stages
     private static final int STAGE_PIN_FIRST = 0;
@@ -61,7 +62,7 @@ public final class PinScreen extends Screen {
     private PinMetaFile.PinMeta meta;           // unlock mode (lazy)
     private boolean[][] qrMatrix;               // setup TOTP verify (lazy)
 
-    private PinScreen(Screen backTo, String levelId, Path worldRoot, String displayName, boolean setup, boolean forCreation, Runnable onCreate) {
+    private PinScreen(Screen backTo, String levelId, Path worldRoot, String displayName, boolean setup, boolean forCreation, Runnable onCreate, Runnable onMaintenance) {
         super(Component.translatable("ciphersave.title"));
         this.backTo = backTo;
         this.levelId = levelId;
@@ -70,16 +71,22 @@ public final class PinScreen extends Screen {
         this.setup = setup;
         this.forCreation = forCreation;
         this.onCreate = onCreate;
+        this.onMaintenance = onMaintenance;
     }
 
     /** World with pin_meta.json → unlock; without → first-open setup. */
     public static PinScreen open(Screen backTo, String levelId, Path worldRoot, String displayName) {
-        return new PinScreen(backTo, levelId, worldRoot, displayName, !PinMetaFile.isPresent(worldRoot), false, null);
+        return new PinScreen(backTo, levelId, worldRoot, displayName, !PinMetaFile.isPresent(worldRoot), false, null, null);
     }
 
     /** Fresh-world creation gate: the world has not been generated yet; onCreate fires it after setup. */
     public static PinScreen openForCreate(Screen backTo, String levelId, Path worldRoot, String displayName, Runnable onCreate) {
-        return new PinScreen(backTo, levelId, worldRoot, displayName, true, true, onCreate);
+        return new PinScreen(backTo, levelId, worldRoot, displayName, true, true, onCreate, null);
+    }
+
+    /** Edit / Recreate gate: decrypted session then run onMaintenance (vanilla edit/recreate flow). */
+    public static PinScreen openForMaintenance(Screen backTo, String levelId, Path worldRoot, String displayName, Runnable onMaintenance) {
+        return new PinScreen(backTo, levelId, worldRoot, displayName, !PinMetaFile.isPresent(worldRoot), false, null, onMaintenance);
     }
 
     @Override
@@ -171,7 +178,7 @@ public final class PinScreen extends Screen {
             PinMetaFile.PinMeta m = meta();
             byte[] masterKey = WorldFileCipher.unwrapWithPin(m, pin.toString());
             success();
-            CipherUnlock.unlockAndOpen(minecraft, backTo, levelId, worldRoot, masterKey);
+            finishUnlock(masterKey);
         } catch (GeneralSecurityException | IOException e) {
             fail(Component.translatable("ciphersave.error.wrongPin"));
         }
@@ -189,9 +196,18 @@ public final class PinScreen extends Screen {
             }
             byte[] masterKey = WorldFileCipher.unwrapWithTotp(meta(), totpCode.toString());
             success();
-            CipherUnlock.unlockAndOpen(minecraft, backTo, levelId, worldRoot, masterKey);
+            finishUnlock(masterKey);
         } catch (GeneralSecurityException | IOException | IllegalArgumentException e) {
             fail(Component.translatable("ciphersave.error.badCode"));
+        }
+    }
+
+    /** Unlock done. Maintenance (edit/recreate) -> decrypt + run callback; otherwise open the world. */
+    private void finishUnlock(byte[] masterKey) {
+        if (onMaintenance != null) {
+            CipherUnlock.unlockForMaintenance(minecraft, worldRoot, masterKey, backTo, onMaintenance);
+        } else {
+            CipherUnlock.unlockAndOpen(minecraft, backTo, levelId, worldRoot, masterKey);
         }
     }
 
